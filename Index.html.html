@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Grab Merchant – Prototype</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#10281B; --green:#0F3D22; --green2:#0F5F2E; --lime:#D9F27A; --lime-soft:#E8F4B8;
+  --bg:#F4F7F0; --card:#FFFFFF; --muted:#4A6354; --track:#E3EBDC; --amber:#F5B544;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  font-family:'Noto Sans Thai','Sarabun',Tahoma,system-ui,sans-serif;
+  color:var(--ink);
+  background:#DCE5D6;
+  display:flex;align-items:center;justify-content:center;
+}
+button{font-family:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid #1B7F44;outline-offset:2px}
+#phone{
+  width:390px;height:880px;max-height:100vh;
+  background:var(--bg);display:flex;flex-direction:column;overflow:hidden;
+  border-radius:36px;box-shadow:0 24px 60px rgba(16,40,27,.25);
+}
+@media (max-width:430px){
+  body{display:block;background:var(--bg)}
+  #phone{width:100%;height:100vh;height:100dvh;max-height:none;border-radius:0;box-shadow:none}
+}
+@media (max-height:880px) and (min-width:431px){
+  #phone{height:100vh}
+}
+#screen{flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto}
+.pad{padding:20px 20px 4px 20px}
+.eyebrow{font-size:13px;color:var(--muted)}
+h1{margin:0;font-size:24px;font-weight:700;line-height:1.3}
+.body{flex:1;display:flex;flex-direction:column;gap:12px;padding:8px 20px 12px 20px}
+.card{background:var(--card);border-radius:16px;padding:14px 16px}
+.row{display:flex;justify-content:space-between;align-items:center}
+.pill{border:0;border-radius:22px;height:44px;font-size:15px}
+.tabs{display:flex;justify-content:space-around;background:#fff;padding:8px 8px calc(14px + env(safe-area-inset-bottom,0px)) 8px;border-top:1px solid #E1E9DB}
+.tab{display:flex;flex-direction:column;align-items:center;gap:2px;border:0;background:transparent;font-size:11px;min-width:64px;min-height:44px}
+.cta{height:52px;border:0;border-radius:26px;font-size:16px;font-weight:700;margin-top:auto;width:100%}
+.step{width:48px;height:48px;border-radius:24px;border:0;font-size:26px;font-weight:600;padding:0}
+@media (prefers-reduced-motion:no-preference){
+  .grow{transition:width .4s}
+  .plate{transition:transform .4s}
+  .frame{transition:all .3s}
+}
+</style>
+</head>
+<body>
+<div id="phone">
+  <div id="screen"></div>
+  <nav class="tabs" id="tabs" aria-label="เมนูหลัก"></nav>
+</div>
+
+<script>
+(function(){
+  var DEF = {screen:'calc',mode:'set',price:120,rate:10,ratio:'1:1',auto:false,shot:false,saved:false,
+             day:5,prep1:false,prep2:false,q1:0,q2:2,q3:4,q4:12,claimed:false};
+  var S = JSON.parse(JSON.stringify(DEF));
+
+  function fmt(n){var p=n.toFixed(2).split('.');return p[0].replace(/\B(?=(\d{3})+(?!\d))/g,',')+'.'+p[1];}
+  function fmt0(n){return String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
+  function set(o){for(var k in o){S[k]=o[k];}render();}
+
+  var ICON = {
+    calc:'<path d="M5 4h11a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"/><path d="M9 8h6M9 12h6"/>',
+    photo:'<path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/>',
+    weekly:'<path d="M5 20v-8M12 20V5M19 20v-12"/>',
+    quest:'<path d="M8 4h8v5a4 4 0 0 1-8 0zM12 13v4M8 20h8"/>'
+  };
+  var TABS=[['calc','ราคา'],['photo','ถ่ายรูป'],['weekly','รายงาน'],['quest','เควส']];
+
+  var DAYS=[
+    {n:'จ.',f:'วันจันทร์',v:2800},{n:'อ.',f:'วันอังคาร',v:2900},{n:'พ.',f:'วันพุธ',v:3100},
+    {n:'พฤ.',f:'วันพฤหัสฯ',v:3300},{n:'ศ.',f:'วันศุกร์',v:4100},{n:'ส.',f:'วันเสาร์',v:5120},{n:'อา.',f:'วันอาทิตย์',v:3540}
+  ];
+  var QDEF=[
+    {k:'q1',title:'ถ่ายรูปเมนูด้วยตัวช่วยจัดรูป',target:1,pts:50,label:'ไปถ่ายรูป',a:'goto',v:'photo'},
+    {k:'q2',title:'ตั้งราคา 3 เมนูด้วยเครื่องคำนวณ',target:3,pts:80,label:'ไปตั้งราคา',a:'goto',v:'calc'},
+    {k:'q3',title:'เปิดร้านครบ 5 วัน',target:5,pts:60,label:'เช็กอินวันนี้',a:'inc',v:'q3'},
+    {k:'q4',title:'รับออเดอร์ภายใน 2 นาที 20 ครั้ง',target:20,pts:100,label:'รับออเดอร์ +4',a:'inc',v:'q4'}
+  ];
+
+  /* ---------------- screens ---------------- */
+  function calc(){
+    var rate=S.rate,customer,fee,net,tip;
+    if(S.mode==='set'){customer=S.price;fee=S.price*rate/100;net=S.price-fee;
+      tip='อยากได้เงินเข้าร้านเต็ม ฿'+fmt(S.price)+' หลังหักค่าคอม ให้ตั้งราคา ฿'+fmt(S.price/(1-rate/100));}
+    else{net=S.price;customer=net/(1-rate/100);fee=customer-net;var r=Math.ceil(customer);
+      tip='ปัดราคาเป็น ฿'+fmt0(r)+' ร้านจะได้ ฿'+fmt(r*(1-rate/100));}
+    var on=function(c){return c?'background:#0F3D22;color:#fff':'background:transparent;color:#2F4A39'};
+    var chips=[10,15,25,30].map(function(v){
+      var a=v===rate;
+      return '<button class="pill" data-a="rate" data-v="'+v+'" style="flex:1;background:'+(a?'#D9F27A':'#EEF3E9')+';color:'+(a?'#10281B':'#2F4A39')+';font-weight:'+(a?700:500)+'">'+v+'%</button>';
+    }).join('');
+    return '<div class="pad"><div class="eyebrow">เครื่องมือร้านค้า</div><h1>คำนวณราคาเมนู</h1></div>'+
+    '<div class="body">'+
+    '<div style="display:flex;background:#E3EBDC;border-radius:14px;padding:4px;gap:4px">'+
+      '<button data-a="mode" data-v="set" style="flex:1;height:44px;border:0;border-radius:11px;font-size:14px;font-weight:600;'+on(S.mode==='set')+'">ตั้งราคาขาย</button>'+
+      '<button data-a="mode" data-v="want" style="flex:1;height:44px;border:0;border-radius:11px;font-size:14px;font-weight:600;'+on(S.mode==='want')+'">อยากได้เท่าไหร่</button></div>'+
+    '<div class="card"><div style="font-size:13px;color:var(--muted)">'+(S.mode==='set'?'ราคาที่ลูกค้าเห็นในแอป':'ยอดที่อยากได้เข้าร้านสุทธิ')+'</div>'+
+      '<div class="row" style="margin-top:6px">'+
+        '<button class="step" aria-label="ลดราคา 10 บาท" data-a="price" data-v="-10" style="background:#E3EBDC;color:#10281B">−</button>'+
+        '<div style="display:flex;align-items:baseline;gap:6px"><span style="font-size:22px;font-weight:600;color:var(--muted)">฿</span><span style="font-size:44px;font-weight:700;line-height:1.2">'+fmt0(S.price)+'</span></div>'+
+        '<button class="step" aria-label="เพิ่มราคา 10 บาท" data-a="price" data-v="10" style="background:#D9F27A;color:#10281B">+</button></div></div>'+
+    '<div class="card"><div class="row"><div style="font-size:13px;color:var(--muted)">ค่าคอมมิชชัน</div><div style="font-size:13px;font-weight:600;color:#0F5F2E">แตะเพื่อเปลี่ยน</div></div>'+
+      '<div style="display:flex;gap:8px;margin-top:10px">'+chips+'</div></div>'+
+    '<div style="background:#0F3D22;border-radius:20px;padding:16px;color:#fff">'+
+      '<div style="font-size:13px;color:#C9DCCB">ราคาแยกให้ชัดเจน</div>'+
+      '<div style="display:flex;height:14px;border-radius:7px;overflow:hidden;gap:3px;margin-top:10px"><div style="flex:'+(100-rate)+';background:#D9F27A"></div><div style="flex:'+rate+';background:#F5B544"></div></div>'+
+      '<div style="display:flex;flex-direction:column;gap:10px;margin-top:14px">'+
+        '<div class="row"><span style="font-size:14px;color:#E6EFE6">ลูกค้าจ่าย</span><span style="font-size:16px;font-weight:600">฿'+fmt(customer)+'</span></div>'+
+        '<div class="row"><span style="font-size:14px;color:#F5B544;font-weight:600">แอป Grab ได้ ('+rate+'%)</span><span style="font-size:16px;font-weight:600;color:#F5B544">−฿'+fmt(fee)+'</span></div>'+
+        '<div style="height:1px;background:#3B6B4D"></div>'+
+        '<div class="row"><span style="font-size:15px;color:#D9F27A;font-weight:700">ร้านได้รับสุทธิ</span><span style="font-size:28px;font-weight:700;color:#D9F27A">฿'+fmt(net)+'</span></div>'+
+      '</div></div>'+
+    '<div style="display:flex;gap:12px;align-items:center;background:#E8F4B8;border-radius:16px;padding:12px 14px">'+
+      '<div style="width:36px;height:36px;border-radius:18px;background:#10281B;color:#D9F27A;display:flex;align-items:center;justify-content:center;flex:none" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-4 10c.8.8 1 1.5 1 2h6c0-.5.2-1.2 1-2a6 6 0 0 0-4-10z"/></svg></div>'+
+      '<div style="font-size:13px;line-height:1.45">'+tip+'</div></div>'+
+    '<button class="cta" data-a="save" style="background:'+(S.saved?'#D9F27A':'#0F5F2E')+';color:'+(S.saved?'#10281B':'#fff')+'">'+(S.saved?'บันทึกแล้ว ✓ เควสตั้งราคา '+S.q2+'/3':'บันทึกราคาเมนู')+'</button>'+
+    '</div>';
+  }
+
+  function photo(){
+    var dims={'1:1':310,'4:3':233,'16:9':174},fh=dims[S.ratio],ft=(350-fh)/2;
+    var chips=['1:1','4:3','16:9'].map(function(v){
+      var a=v===S.ratio;
+      return '<button class="pill" data-a="ratio" data-v="'+v+'" style="flex:1;background:'+(a?'#D9F27A':'#1B3A29')+';color:'+(a?'#10281B':'#E6EFE6')+';font-weight:'+(a?700:500)+'">'+v+'</button>';
+    }).join('');
+    var check='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12l5 5 9-10"/></svg>';
+    var ok=function(t){return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0"><div style="width:24px;height:24px;border-radius:12px;background:#D9F27A;color:#10281B;display:flex;align-items:center;justify-content:center;flex:none" aria-hidden="true">'+check+'</div><div style="font-size:14px">'+t+'</div></div>'};
+    var line=function(css){return '<div style="position:absolute;background:rgba(255,255,255,.28);'+css+'"></div>'};
+    return '<div style="flex:1;display:flex;flex-direction:column;background:#0C1F14;color:#fff;min-height:0">'+
+    '<div class="pad"><div style="font-size:13px;color:#B8CDBE">ตัวช่วยถ่ายรูป</div><h1>ถ่ายรูปเมนู</h1></div>'+
+    '<div style="padding:8px 20px 0"><div style="position:relative;width:350px;max-width:100%;height:350px;border-radius:20px;background:#34423A;overflow:hidden;margin:0 auto">'+
+      line('left:116px;top:0;width:1px;height:350px')+line('left:233px;top:0;width:1px;height:350px')+line('top:116px;left:0;height:1px;width:350px')+line('top:233px;left:0;height:1px;width:350px')+
+      '<svg class="plate" style="position:absolute;left:0;top:0;transform:translateX('+(S.auto?-21:0)+'px)" width="350" height="350" viewBox="0 0 350 350" role="img" aria-label="ตัวอย่างจานข้าวมันไก่ทอด (ภาพตัวอย่าง)">'+
+        '<circle cx="196" cy="182" r="112" fill="#EDEFE9"/><circle cx="196" cy="182" r="92" fill="#fff"/><ellipse cx="180" cy="196" rx="52" ry="40" fill="#F4E9C6"/>'+
+        '<rect x="196" y="140" width="64" height="26" rx="13" fill="#C9822F" transform="rotate(-18 228 153)"/><rect x="206" y="172" width="60" height="26" rx="13" fill="#B97325" transform="rotate(12 236 185)"/>'+
+        '<rect x="150" y="128" width="44" height="22" rx="11" fill="#C9822F" transform="rotate(8 172 139)"/><circle cx="146" cy="234" r="10" fill="#4C9B4A"/><circle cx="164" cy="242" r="8" fill="#E4573D"/></svg>'+
+      '<div class="frame" style="position:absolute;left:20px;top:'+ft+'px;width:310px;height:'+fh+'px;border:2.5px dashed #D9F27A;border-radius:10px"></div>'+
+      '<div style="position:absolute;left:28px;top:'+(ft+8)+'px;background:#D9F27A;color:#10281B;font-size:12px;font-weight:700;padding:4px 10px;border-radius:12px">กรอบ '+S.ratio+'</div>'+
+      '<div style="position:absolute;left:50%;transform:translateX(-50%);bottom:18px;background:#10281B;color:#fff;font-size:13px;font-weight:500;padding:8px 14px;border-radius:18px;white-space:nowrap">'+(S.auto?'จัดกึ่งกลางแล้ว พร้อมถ่าย':'ขยับจานไปทางซ้ายอีกนิด')+'</div>'+
+      (S.shot?'<div style="position:absolute;inset:0;background:rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center"><div style="background:#D9F27A;color:#10281B;font-size:15px;font-weight:700;padding:12px 18px;border-radius:24px">บันทึกรูปแล้ว · กรอบ '+S.ratio+'</div></div>':'')+
+    '</div></div>'+
+    '<div style="padding:14px 20px 0"><div class="row"><div style="font-size:13px;color:#B8CDBE">สัดส่วนรูป</div><div style="font-size:12px;color:#D9F27A;font-weight:600">Grab แนะนำ 1:1</div></div><div style="display:flex;gap:8px;margin-top:8px">'+chips+'</div></div>'+
+    '<div style="margin:14px 20px 0;background:#14301F;border-radius:18px;padding:6px 14px">'+
+      ok('แสงสว่างพอดี')+'<div style="height:1px;background:#244B33"></div>'+ok('มุมกล้องเหมาะสม (ถ่ายจากด้านบน)')+'<div style="height:1px;background:#244B33"></div>'+
+      '<div style="display:flex;align-items:center;gap:10px;padding:8px 0"><div style="width:24px;height:24px;border-radius:12px;background:'+(S.auto?'#D9F27A':'#F5B544')+';color:#10281B;display:flex;align-items:center;justify-content:center;flex:none;font-size:14px;font-weight:800" aria-hidden="true">'+(S.auto?'✓':'!')+'</div><div style="font-size:14px">'+(S.auto?'จานอยู่กึ่งกลางกรอบแล้ว':'จานเยื้องขวา · กด “จัดอัตโนมัติ” ได้เลย')+'</div></div>'+
+    '</div>'+
+    '<div style="margin-top:auto;display:flex;align-items:center;justify-content:space-between;padding:10px 28px 14px"><div style="width:56px"></div>'+
+      '<button aria-label="ถ่ายรูป" data-a="shot" style="width:76px;height:76px;border-radius:38px;border:4px solid #fff;background:#D9F27A;padding:0"></button>'+
+      '<button data-a="auto" style="height:56px;padding:0 14px;border-radius:28px;border:0;background:'+(S.auto?'#D9F27A':'#fff')+';color:#10281B;font-size:13px;font-weight:700">'+(S.auto?'จัดแล้ว ✓':'จัดอัตโนมัติ')+'</button></div>'+
+    '</div>';
+  }
+
+  function weekly(){
+    var sel=DAYS[S.day],best=S.day===5,gap=Math.round((1-sel.v/5120)*100);
+    var bars=DAYS.map(function(d,i){
+      var a=i===S.day;
+      return '<button aria-label="'+d.f+' ยอดขาย '+fmt0(d.v)+' บาท" data-a="day" data-v="'+i+'" style="display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;width:44px;height:160px;border:0;background:transparent;padding:0">'+
+        '<div style="font-size:11px;font-weight:700;color:#0F3D22;height:14px">'+(a?'฿'+fmt0(d.v):'')+'</div>'+
+        '<div style="width:30px;height:'+Math.round(d.v*0.0234)+'px;border-radius:8px;background:'+(a?'#0F3D22':'#CFDBC9')+'"></div>'+
+        '<div style="font-size:12px;color:'+(a?'#0F3D22':'#4A6354')+';font-weight:'+(a?700:400)+'">'+d.n+'</div></button>';
+    }).join('');
+    var alert=function(bg,icon,title,text,key,fg){
+      var on=S[key];
+      return '<div style="background:'+bg+';border-radius:16px;padding:12px 14px"><div style="display:flex;gap:12px">'+
+        '<div style="width:40px;height:40px;border-radius:20px;background:#10281B;color:'+fg+';display:flex;align-items:center;justify-content:center;flex:none" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+icon+'</svg></div>'+
+        '<div style="flex:1"><div style="font-size:14px;font-weight:700">'+title+'</div><div style="font-size:13px;line-height:1.45;margin-top:2px;color:#33301F">'+text+'</div></div></div>'+
+        '<button data-a="prep" data-v="'+key+'" style="width:100%;height:44px;margin-top:8px;border:0;border-radius:22px;background:'+(on?'#10281B':'#fff')+';color:'+(on?'#fff':'#10281B')+';font-size:13px;font-weight:700">'+(on?'ตั้งเตือนแล้ว ✓ แตะเพื่อยกเลิก':'ตั้งเตือนเตรียมของ')+'</button></div>';
+    };
+    return '<div class="pad"><div class="eyebrow">6 – 12 ต.ค. 2569</div><h1>รายงานประจำสัปดาห์</h1></div>'+
+    '<div class="body">'+
+    '<div style="background:#0F3D22;border-radius:20px;padding:16px;color:#fff"><div style="font-size:13px;color:#C9DCCB">ยอดขายสัปดาห์นี้</div>'+
+      '<div style="display:flex;align-items:baseline;gap:10px;margin-top:2px;flex-wrap:wrap"><div style="font-size:34px;font-weight:700">฿24,860</div><div style="font-size:13px;font-weight:600;color:#D9F27A">▲ 8% จากสัปดาห์ก่อน</div></div>'+
+      '<div style="display:flex;gap:10px;margin-top:12px"><div style="flex:1;background:#1B4D2E;border-radius:12px;padding:8px 12px"><div style="font-size:12px;color:#C9DCCB">ออเดอร์</div><div style="font-size:18px;font-weight:700">182</div></div>'+
+      '<div style="flex:2;background:#1B4D2E;border-radius:12px;padding:8px 12px"><div style="font-size:12px;color:#C9DCCB">เมนูขายดี</div><div style="font-size:16px;font-weight:700">ข้าวมันไก่ทอด</div></div></div></div>'+
+    '<div style="background:#fff;border-radius:20px;padding:14px 16px 12px">'+
+      '<div class="row" style="gap:8px"><div style="font-size:15px;font-weight:700">'+sel.f+' ฿'+fmt0(sel.v)+'</div><div style="font-size:12px;font-weight:700;background:'+(best?'#D9F27A':'#E3EBDC')+';padding:4px 10px;border-radius:12px;text-align:right">'+(best?'ขายดีสุดของสัปดาห์':'ต่ำกว่าวันขายดีสุด '+gap+'%')+'</div></div>'+
+      '<div style="display:flex;align-items:flex-end;justify-content:space-between;height:160px;margin-top:6px">'+bars+'</div></div>'+
+    '<div style="font-size:15px;font-weight:700;margin-top:2px">เตรียมวัตถุดิบล่วงหน้า</div>'+
+    alert('#FFF0D4','<path d="M7 15a4 4 0 0 1-.5-8 5.5 5.5 0 0 1 10.6 1.2A3.5 3.5 0 0 1 17 15z"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/>','พรุ่งนี้ (พุธ) ฝนตกช่วงเย็น','คนน่าจะสั่งน้อยลง แนะนำเตรียมวัตถุดิบลดลงประมาณ 15%','prep1','#F5B544')+
+    alert('#E8F4B8','<rect x="4" y="5" width="16" height="15" rx="3"/><path d="M8 3v4M16 3v4M4 10h16"/>','ศุกร์ 23 ต.ค. วันหยุด','คนน่าจะสั่งเยอะ แนะนำเตรียมวัตถุดิบเพิ่มประมาณ 20%','prep2','#D9F27A')+
+    '</div>';
+  }
+
+  function quest(){
+    var earned=0,done=0;
+    var cards=QDEF.map(function(d){
+      var v=S[d.k],fin=v>=d.target;
+      if(fin){earned+=d.pts;done++;}
+      return '<div style="background:'+(fin?'#E8F4B8':'#fff')+';border-radius:16px;padding:12px 14px">'+
+        '<div class="row" style="gap:8px"><div style="font-size:14px;font-weight:700">'+d.title+'</div><div style="font-size:12px;font-weight:700;color:#0F5F2E;white-space:nowrap">+'+d.pts+' แต้ม</div></div>'+
+        '<div style="display:flex;align-items:center;gap:10px;margin-top:8px">'+
+          '<div style="flex:1;height:10px;border-radius:5px;background:'+(fin?'#fff':'#E3EBDC')+';overflow:hidden"><div class="grow" style="width:'+Math.round(v/d.target*100)+'%;height:10px;border-radius:5px;background:#0F5F2E"></div></div>'+
+          '<div style="font-size:12px;font-weight:600;color:#2F4A39">'+v+'/'+d.target+'</div>'+
+          (fin?'<div style="height:44px;display:flex;align-items:center;font-size:13px;font-weight:700;color:#0F3D22">เสร็จแล้ว ✓</div>'
+              :'<button data-a="'+d.a+'" data-v="'+d.v+'" style="height:44px;padding:0 14px;border:0;border-radius:22px;background:#0F5F2E;color:#fff;font-size:13px;font-weight:700">'+d.label+'</button>')+
+        '</div></div>';
+    }).join('');
+    var all=done===4,lab='ทำเควสให้ครบเพื่อรับรางวัล',bg='#CFDBC9',fg='#2F4A39';
+    if(all&&!S.claimed){lab='รับรางวัลพิเศษ';bg='#0F5F2E';fg='#fff';}
+    if(S.claimed){lab='รับรางวัลแล้ว ✓';bg='#D9F27A';fg='#10281B';}
+    return '<div class="pad"><div class="eyebrow">รีเซ็ตทุกวันจันทร์</div><h1>เควสประจำสัปดาห์</h1></div>'+
+    '<div class="body" style="gap:10px">'+
+    '<div style="background:#0F3D22;border-radius:20px;padding:14px 16px;color:#fff"><div class="row"><div style="font-size:13px;color:#C9DCCB">ความคืบหน้า</div><div style="font-size:13px;font-weight:700;color:#D9F27A">สำเร็จ '+done+' จาก 4 เควส</div></div>'+
+      '<div style="font-size:28px;font-weight:700;margin-top:2px">'+earned+' <span style="font-size:15px;font-weight:500;color:#C9DCCB">แต้มสะสม</span></div>'+
+      '<div style="height:12px;border-radius:6px;background:#1B4D2E;margin-top:10px;overflow:hidden"><div class="grow" style="width:'+Math.round(earned/290*100)+'%;height:12px;border-radius:6px;background:#D9F27A"></div></div>'+
+      '<div style="font-size:12px;color:#C9DCCB;margin-top:6px">'+(all?'ครบทุกเควสแล้ว กดรับรางวัลได้เลย':'อีก '+(290-earned)+' แต้ม รับรางวัลสัปดาห์นี้')+'</div></div>'+
+    cards+
+    '<button class="cta" data-a="claim" data-ok="'+(all?1:0)+'" style="background:'+bg+';color:'+fg+'">'+lab+'</button></div>';
+  }
+
+  /* ---------------- render ---------------- */
+  function render(){
+    var html={calc:calc,photo:photo,weekly:weekly,quest:quest}[S.screen]();
+    var el=document.getElementById('screen');
+    var top=el.scrollTop;
+    el.innerHTML=html;
+    el.scrollTop=top;
+    document.getElementById('tabs').innerHTML=TABS.map(function(t){
+      var a=S.screen===t[0];
+      return '<button class="tab" data-a="goto" data-v="'+t[0]+'"'+(a?' aria-current="page"':'')+' style="color:'+(a?'#0F3D22':'#4A6354')+';font-weight:'+(a?700:500)+'">'+
+        '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+ICON[t[0]]+'</svg>'+t[1]+'</button>';
+    }).join('');
+  }
+
+  document.getElementById('phone').addEventListener('click',function(e){
+    var b=e.target.closest('[data-a]'); if(!b) return;
+    var a=b.getAttribute('data-a'),v=b.getAttribute('data-v');
+    if(a==='goto') set({screen:v,});
+    else if(a==='mode') set(v==='set'?{mode:'set',price:120,saved:false}:{mode:'want',price:108,saved:false});
+    else if(a==='price') set({price:Math.max(10,S.price+parseInt(v,10)),saved:false});
+    else if(a==='rate') set({rate:parseInt(v,10),saved:false});
+    else if(a==='save'){ if(!S.saved) set({saved:true,q2:Math.min(3,S.q2+1)}); }
+    else if(a==='ratio') set({ratio:v,shot:false});
+    else if(a==='auto') set({auto:true,shot:false});
+    else if(a==='shot') set({shot:true,q1:1});
+    else if(a==='day') set({day:parseInt(v,10)});
+    else if(a==='prep'){ var o={}; o[v]=!S[v]; set(o); }
+    else if(a==='inc'){ var o2={}; o2[v]=Math.min(v==='q3'?5:20,S[v]+(v==='q3'?1:4)); set(o2); }
+    else if(a==='claim'){ if(b.getAttribute('data-ok')==='1') set({claimed:true}); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
